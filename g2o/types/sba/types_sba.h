@@ -335,28 +335,55 @@ class G2O_TYPES_SBA_API VertexIntrinsics : public BaseVertex<4, Eigen::Matrix<do
 /**
  * \brief edge between two SBAcam that specifies the distance between them
  */
- class G2O_TYPES_SBA_API EdgeSBAScale : public BaseBinaryEdge<1, double, VertexCam, VertexCam>
-{
-  public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    EdgeSBAScale();
-    virtual bool read(std::istream& is);
-    virtual bool write(std::ostream& os) const;
-    void computeError()
-    {
-      const VertexCam* v1 = dynamic_cast<const VertexCam*>(_vertices[0]);
-      const VertexCam* v2 = dynamic_cast<const VertexCam*>(_vertices[1]);
-      Vector3D dt=v2->estimate().translation()-v1->estimate().translation();
-      _error[0] = _measurement - dt.norm();
-    }
-    virtual void setMeasurement(const double& m){
-      _measurement = m;
-    }
-    virtual double initialEstimatePossible(const OptimizableGraph::VertexSet& , OptimizableGraph::Vertex* ) { return 1.;}
-    virtual void initialEstimate(const OptimizableGraph::VertexSet& from_, OptimizableGraph::Vertex* to_);
+class G2O_TYPES_SBA_API EdgeSBAScale
+    : public BaseBinaryEdge<1, double, VertexCam, VertexCam> {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  EdgeSBAScale();
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
+  void computeError() {
+    const VertexCam* v1 = dynamic_cast<const VertexCam*>(_vertices[0]);
+    const VertexCam* v2 = dynamic_cast<const VertexCam*>(_vertices[1]);
+    Vector3D dt = v2->estimate().translation() - v1->estimate().translation();
+    _error[0] = _measurement - dt.norm();
+  }
+  virtual void setMeasurement(const double& m) { _measurement = m; }
+  virtual double initialEstimatePossible(const OptimizableGraph::VertexSet&,
+                                         OptimizableGraph::Vertex*) {
+    return 1.;
+  }
+  virtual void initialEstimate(const OptimizableGraph::VertexSet& from_,
+                               OptimizableGraph::Vertex* to_);
 };
 
+/**
+ * \brief edge between three SBACams to enforce piece-wise linear motion
+ */
+class G2O_TYPES_SBA_API EdgeSBALinearMotion
+    : public BaseMultiEdge<6, VertexCam> {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  EdgeSBALinearMotion();
+  EdgeSBALinearMotion(VertexCam* cam0, VertexCam* cam1, VertexCam* cam2);
 
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
+  void computeError() {
+    const VertexCam* v0 = dynamic_cast<const VertexCam*>(_vertices[0]);
+    const VertexCam* v1 = dynamic_cast<const VertexCam*>(_vertices[1]);
+    const VertexCam* v2 = dynamic_cast<const VertexCam*>(_vertices[2]);
+    SE3Quat v10 = v1->estimate().inverse() * v0->estimate();
+    SE3Quat v21 = v2->estimate().inverse() * v1->estimate();
+    _error = (v10 * v21.inverse()).log();
+    //_error[0] = delta.translation().x();
+    //_error[1] = delta.translation().y();
+    //_error[2] = delta.translation().z();
+    //_error[3] = delta.rotation().x();
+    //_error[4] = delta.rotation().y();
+    //_error[5] = delta.rotation().z();
+  }
+};
 
 } // end namespace
 
