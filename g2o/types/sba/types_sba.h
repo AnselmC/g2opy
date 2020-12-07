@@ -27,14 +27,15 @@
 #ifndef G2O_SBA_TYPES
 #define G2O_SBA_TYPES
 
-#include "g2o/core/base_vertex.h"
-#include "g2o/core/base_binary_edge.h"
-#include "g2o/core/base_multi_edge.h"
-#include "sbacam.h"
 #include <Eigen/Geometry>
 #include <iostream>
 
+#include "g2o/core/base_binary_edge.h"
+#include "g2o/core/base_multi_edge.h"
+#include "g2o/core/base_vertex.h"
+#include "g2o/types/slam3d/parameter_se3_offset.h"
 #include "g2o_types_sba_api.h"
+#include "sbacam.h"
 
 namespace g2o {
 
@@ -42,295 +43,279 @@ namespace g2o {
  * \brief Vertex encoding the intrinsics of the camera fx, fy, cx, xy, baseline;
  */
 
-class G2O_TYPES_SBA_API VertexIntrinsics : public BaseVertex<4, Eigen::Matrix<double, 5, 1, Eigen::ColMajor> >
-{
-  public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    VertexIntrinsics();
-    virtual bool read(std::istream& is);
-    virtual bool write(std::ostream& os) const;
-      
-    virtual void setToOriginImpl() {
-      _estimate << 1., 1., 0.5, 0.5, 0.1;
-    }
-      
-    virtual void oplusImpl(const double* update)
-    {
-      _estimate.head<4>() += Vector4D(update);
-    }
- };
+class G2O_TYPES_SBA_API VertexIntrinsics
+    : public BaseVertex<4, Eigen::Matrix<double, 5, 1, Eigen::ColMajor> > {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  VertexIntrinsics();
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
+
+  virtual void setToOriginImpl() { _estimate << 1., 1., 0.5, 0.5, 0.1; }
+
+  virtual void oplusImpl(const double* update) {
+    _estimate.head<4>() += Vector4D(update);
+  }
+};
 
 /**
  * \brief SBACam Vertex, (x,y,z,qw,qx,qy,qz)
  * the parameterization for the increments constructed is a 6d vector
  * (x,y,z,qx,qy,qz) (note that we leave out the w part of the quaternion.
- * qw is assumed to be positive, otherwise there is an ambiguity in qx,qy,qz as a rotation
+ * qw is assumed to be positive, otherwise there is an ambiguity in qx,qy,qz as
+ * a rotation
  */
 
+class G2O_TYPES_SBA_API VertexCam : public BaseVertex<6, SBACam> {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+  VertexCam();
 
-  class G2O_TYPES_SBA_API VertexCam : public BaseVertex<6, SBACam>
-{
-  public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    VertexCam();
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
 
-    virtual bool read(std::istream& is);
-    virtual bool write(std::ostream& os) const;
+  virtual void setToOriginImpl() { _estimate = SBACam(); }
 
-    virtual void setToOriginImpl() {
-      _estimate = SBACam();
-    }
-    
-    virtual void setEstimate(const SBACam& cam){
-      BaseVertex<6, SBACam>::setEstimate(cam);
-      _estimate.setTransform();
-      _estimate.setProjection();
-      _estimate.setDr();
-    }
-    
-    virtual void oplusImpl(const double* update)
-    {
-      Eigen::Map<const Vector6d> v(update);
-      _estimate.update(v);
-      _estimate.setTransform();
-      _estimate.setProjection();
-      _estimate.setDr();
-    }
-    
+  virtual void setEstimate(const SBACam& cam) {
+    BaseVertex<6, SBACam>::setEstimate(cam);
+    _estimate.setTransform();
+    _estimate.setProjection();
+    _estimate.setDr();
+  }
 
-    virtual bool setEstimateDataImpl(const double* est){
-      Eigen::Map <const Vector7d> v(est);
-      _estimate.fromVector(v);
-      return true;
-    }
+  virtual void oplusImpl(const double* update) {
+    Eigen::Map<const Vector6d> v(update);
+    _estimate.update(v);
+    _estimate.setTransform();
+    _estimate.setProjection();
+    _estimate.setDr();
+  }
 
-    virtual bool getEstimateData(double* est) const{
-      Eigen::Map <Vector7d> v(est);
-      v = estimate().toVector();
-      return true;
-    }
+  virtual bool setEstimateDataImpl(const double* est) {
+    Eigen::Map<const Vector7d> v(est);
+    _estimate.fromVector(v);
+    return true;
+  }
 
-    virtual int estimateDimension() const {
-      return 7;
-    }
+  virtual bool getEstimateData(double* est) const {
+    Eigen::Map<Vector7d> v(est);
+    v = estimate().toVector();
+    return true;
+  }
 
-    virtual bool setMinimalEstimateDataImpl(const double* est){
-      Eigen::Map<const Vector6d> v(est);
-      _estimate.fromMinimalVector(v);
-      return true;
-    }
+  virtual int estimateDimension() const { return 7; }
 
-    virtual bool getMinimalEstimateData(double* est) const{
-      Eigen::Map<Vector6d> v(est);
-      v = _estimate.toMinimalVector();
-      return true;
-    }
+  virtual bool setMinimalEstimateDataImpl(const double* est) {
+    Eigen::Map<const Vector6d> v(est);
+    _estimate.fromMinimalVector(v);
+    return true;
+  }
 
-    virtual int minimalEstimateDimension() const {
-      return 6;
-    }
- };
+  virtual bool getMinimalEstimateData(double* est) const {
+    Eigen::Map<Vector6d> v(est);
+    v = _estimate.toMinimalVector();
+    return true;
+  }
+
+  virtual int minimalEstimateDimension() const { return 6; }
+};
 
 /**
  * \brief Point vertex, XYZ
  */
- class G2O_TYPES_SBA_API VertexSBAPointXYZ : public BaseVertex<3, Vector3D>
-{
-  public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW    
-    VertexSBAPointXYZ();
-    virtual bool read(std::istream& is);
-    virtual bool write(std::ostream& os) const;
+class G2O_TYPES_SBA_API VertexSBAPointXYZ : public BaseVertex<3, Vector3D> {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  VertexSBAPointXYZ();
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
 
-    virtual void setToOriginImpl() {
-      _estimate.fill(0.);
-    }
+  virtual void setToOriginImpl() { _estimate.fill(0.); }
 
-    virtual void oplusImpl(const double* update)
-    {
-      Eigen::Map<const Vector3D> v(update);
-      _estimate += v;
-    }
+  virtual void oplusImpl(const double* update) {
+    Eigen::Map<const Vector3D> v(update);
+    _estimate += v;
+  }
 };
-
 
 // monocular projection
 // first two args are the measurement type, second two the connection classes
- class G2O_TYPES_SBA_API EdgeProjectP2MC : public  BaseBinaryEdge<2, Vector2D, VertexSBAPointXYZ, VertexCam> 
-{
-  public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    EdgeProjectP2MC();
-    virtual bool read(std::istream& is);
-    virtual bool write(std::ostream& os) const;
+class G2O_TYPES_SBA_API EdgeProjectP2MC
+    : public BaseBinaryEdge<2, Vector2D, VertexSBAPointXYZ, VertexCam> {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  EdgeProjectP2MC();
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
 
-    // return the error estimate as a 2-vector
-    void computeError()
-    {
-      // from <Point> to <Cam>
-      const VertexSBAPointXYZ *point = static_cast<const VertexSBAPointXYZ*>(_vertices[0]);
-      const VertexCam *cam = static_cast<const VertexCam*>(_vertices[1]);
+  // return the error estimate as a 2-vector
+  void computeError() {
+    // from <Point> to <Cam>
+    const VertexSBAPointXYZ* point =
+        static_cast<const VertexSBAPointXYZ*>(_vertices[0]);
+    const VertexCam* cam = static_cast<const VertexCam*>(_vertices[1]);
 
-      // calculate the projection
-      const Vector3D &pt = point->estimate();
-      Vector4D ppt(pt(0),pt(1),pt(2),1.0);
-      Vector3D p = cam->estimate().w2i * ppt;
-      Vector2D perr;
-      perr = p.head<2>()/p(2);
-      //      std::cout << std::endl << "CAM   " << cam->estimate() << std::endl;
-      //      std::cout << "POINT " << pt.transpose() << std::endl;
-      //      std::cout << "PROJ  " << p.transpose() << std::endl;
-      //      std::cout << "CPROJ " << perr.transpose() << std::endl;
-      //      std::cout << "MEAS  " << _measurement.transpose() << std::endl;
+    // calculate the projection
+    const Vector3D& pt = point->estimate();
+    Vector4D ppt(pt(0), pt(1), pt(2), 1.0);
+    Vector3D p = cam->estimate().w2i * ppt;
+    Vector2D perr;
+    perr = p.head<2>() / p(2);
+    //      std::cout << std::endl << "CAM   " << cam->estimate() << std::endl;
+    //      std::cout << "POINT " << pt.transpose() << std::endl;
+    //      std::cout << "PROJ  " << p.transpose() << std::endl;
+    //      std::cout << "CPROJ " << perr.transpose() << std::endl;
+    //      std::cout << "MEAS  " << _measurement.transpose() << std::endl;
 
-      // error, which is backwards from the normal observed - calculated
-      // _measurement is the measured projection
-      _error = perr - _measurement;
-      // std::cerr << _error.x() << " " << _error.y() <<  " " << chi2() << std::endl;
-    }
+    // error, which is backwards from the normal observed - calculated
+    // _measurement is the measured projection
+    _error = perr - _measurement;
+    // std::cerr << _error.x() << " " << _error.y() <<  " " << chi2() <<
+    // std::endl;
+  }
 
-    // jacobian
-    virtual void linearizeOplus();
+  // jacobian
+  virtual void linearizeOplus();
 };
 
 // stereo projection
 // first two args are the measurement type, second two the connection classes
- class G2O_TYPES_SBA_API EdgeProjectP2SC : public  BaseBinaryEdge<3, Vector3D, VertexSBAPointXYZ, VertexCam>
-{
-  public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    EdgeProjectP2SC();
-    virtual bool read(std::istream& is);
-    virtual bool write(std::ostream& os) const;
+class G2O_TYPES_SBA_API EdgeProjectP2SC
+    : public BaseBinaryEdge<3, Vector3D, VertexSBAPointXYZ, VertexCam> {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  EdgeProjectP2SC();
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
 
-    // return the error estimate as a 2-vector
-    void computeError()
-    {
-      // from <Point> to <Cam>
-      const VertexSBAPointXYZ *point = static_cast<const VertexSBAPointXYZ*>(_vertices[0]);
-      VertexCam *cam = static_cast<VertexCam*>(_vertices[1]);
+  // return the error estimate as a 2-vector
+  void computeError() {
+    // from <Point> to <Cam>
+    const VertexSBAPointXYZ* point =
+        static_cast<const VertexSBAPointXYZ*>(_vertices[0]);
+    VertexCam* cam = static_cast<VertexCam*>(_vertices[1]);
 
-      // calculate the projection
-      Vector3D kp;
-      Vector4D pt;
-      pt.head<3>() = point->estimate();
-      pt(3) = 1.0;
-      const SBACam& nd = cam->estimate();
-      // these should be already ok
-      /* nd.setTransform(); */
-      /* nd.setProjection(); */
-      /* nd.setDr(); */
+    // calculate the projection
+    Vector3D kp;
+    Vector4D pt;
+    pt.head<3>() = point->estimate();
+    pt(3) = 1.0;
+    const SBACam& nd = cam->estimate();
+    // these should be already ok
+    /* nd.setTransform(); */
+    /* nd.setProjection(); */
+    /* nd.setDr(); */
 
-      Vector3D p1 = nd.w2i * pt; 
-      Vector3D p2 = nd.w2n * pt; 
-      Vector3D pb(nd.baseline,0,0);
+    Vector3D p1 = nd.w2i * pt;
+    Vector3D p2 = nd.w2n * pt;
+    Vector3D pb(nd.baseline, 0, 0);
 
-      double invp1 = 1.0/p1(2);
-      kp.head<2>() = p1.head<2>()*invp1;
+    double invp1 = 1.0 / p1(2);
+    kp.head<2>() = p1.head<2>() * invp1;
 
-      // right camera px
-      p2 = nd.Kcam*(p2-pb);
-      kp(2) = p2(0)/p2(2);
+    // right camera px
+    p2 = nd.Kcam * (p2 - pb);
+    kp(2) = p2(0) / p2(2);
 
-      // std::cout << std::endl << "CAM   " << cam->estimate() << std::endl; 
-      // std::cout << "POINT " << pt.transpose() << std::endl; 
-      // std::cout << "PROJ  " << p1.transpose() << std::endl; 
-      // std::cout << "PROJ  " << p2.transpose() << std::endl; 
-      // std::cout << "CPROJ " << kp.transpose() << std::endl; 
-      // std::cout << "MEAS  " << _measurement.transpose() << std::endl; 
+    // std::cout << std::endl << "CAM   " << cam->estimate() << std::endl;
+    // std::cout << "POINT " << pt.transpose() << std::endl;
+    // std::cout << "PROJ  " << p1.transpose() << std::endl;
+    // std::cout << "PROJ  " << p2.transpose() << std::endl;
+    // std::cout << "CPROJ " << kp.transpose() << std::endl;
+    // std::cout << "MEAS  " << _measurement.transpose() << std::endl;
 
-      // error, which is backwards from the normal observed - calculated
-      // _measurement is the measured projection
-      _error = kp - _measurement;
-    }
+    // error, which is backwards from the normal observed - calculated
+    // _measurement is the measured projection
+    _error = kp - _measurement;
+  }
 
-    // jacobian
-    virtual void linearizeOplus();
-
+  // jacobian
+  virtual void linearizeOplus();
 };
 
 // monocular projection with parameter calibration
 // first two args are the measurement type, second two the connection classes
- class G2O_TYPES_SBA_API EdgeProjectP2MC_Intrinsics : public  BaseMultiEdge<2, Vector2D> 
-{
-  public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    EdgeProjectP2MC_Intrinsics();
-    virtual bool read(std::istream& is);
-    virtual bool write(std::ostream& os) const;
+class G2O_TYPES_SBA_API EdgeProjectP2MC_Intrinsics
+    : public BaseMultiEdge<2, Vector2D> {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  EdgeProjectP2MC_Intrinsics();
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
 
-    // return the error estimate as a 2-vector
-    void computeError()
-    {
-      // from <Point> to <Cam>, the intrinsics in KCam should be already set!
-      const VertexSBAPointXYZ *point = static_cast<const VertexSBAPointXYZ*>(_vertices[0]);
-      VertexCam *cam = static_cast<VertexCam*>(_vertices[1]);
-      // calculate the projection
-      const Vector3D &pt = point->estimate();
-      Vector4D ppt(pt(0),pt(1),pt(2),1.0);
-      Vector3D p = cam->estimate().w2i * ppt;
-      Vector2D perr = p.head<2>()/p(2);
-      _error = perr - _measurement;
-    }
+  // return the error estimate as a 2-vector
+  void computeError() {
+    // from <Point> to <Cam>, the intrinsics in KCam should be already set!
+    const VertexSBAPointXYZ* point =
+        static_cast<const VertexSBAPointXYZ*>(_vertices[0]);
+    VertexCam* cam = static_cast<VertexCam*>(_vertices[1]);
+    // calculate the projection
+    const Vector3D& pt = point->estimate();
+    Vector4D ppt(pt(0), pt(1), pt(2), 1.0);
+    Vector3D p = cam->estimate().w2i * ppt;
+    Vector2D perr = p.head<2>() / p(2);
+    _error = perr - _measurement;
+  }
 
-    // jacobian
-    virtual void linearizeOplus();
-
+  // jacobian
+  virtual void linearizeOplus();
 };
-
 
 /**
  * \brief 3D edge between two SBAcam
  */
- class G2O_TYPES_SBA_API EdgeSBACam : public BaseBinaryEdge<6, SE3Quat, VertexCam, VertexCam>
-{
-  public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    EdgeSBACam();
-    virtual bool read(std::istream& is);
-    virtual bool write(std::ostream& os) const;
-    void computeError()
-    {
-      const VertexCam* v1 = dynamic_cast<const VertexCam*>(_vertices[0]);
-      const VertexCam* v2 = dynamic_cast<const VertexCam*>(_vertices[1]);
-      SE3Quat delta = _inverseMeasurement * (v1->estimate().inverse()*v2->estimate());
-      _error[0]=delta.translation().x();
-      _error[1]=delta.translation().y();
-      _error[2]=delta.translation().z();
-      _error[3]=delta.rotation().x();
-      _error[4]=delta.rotation().y();
-      _error[5]=delta.rotation().z();
-    }
-    
-    virtual void setMeasurement(const SE3Quat& meas){
-      _measurement=meas;
-      _inverseMeasurement=meas.inverse();
-    }
+class G2O_TYPES_SBA_API EdgeSBACam
+    : public BaseBinaryEdge<6, SE3Quat, VertexCam, VertexCam> {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+  EdgeSBACam();
+  virtual bool read(std::istream& is);
+  virtual bool write(std::ostream& os) const;
+  void computeError() {
+    const VertexCam* v1 = dynamic_cast<const VertexCam*>(_vertices[0]);
+    const VertexCam* v2 = dynamic_cast<const VertexCam*>(_vertices[1]);
+    SE3Quat delta =
+        _inverseMeasurement * (v1->estimate().inverse() * v2->estimate());
+    _error[0] = delta.translation().x();
+    _error[1] = delta.translation().y();
+    _error[2] = delta.translation().z();
+    _error[3] = delta.rotation().x();
+    _error[4] = delta.rotation().y();
+    _error[5] = delta.rotation().z();
+  }
 
-    virtual double initialEstimatePossible(const OptimizableGraph::VertexSet& , OptimizableGraph::Vertex* ) { return 1.;}
-    virtual void initialEstimate(const OptimizableGraph::VertexSet& from, OptimizableGraph::Vertex* to);
+  virtual void setMeasurement(const SE3Quat& meas) {
+    _measurement = meas;
+    _inverseMeasurement = meas.inverse();
+  }
 
-    virtual bool setMeasurementData(const double* d){
-      Eigen::Map<const Vector7d> v(d);
-      _measurement.fromVector(v);
-      _inverseMeasurement = _measurement.inverse();
-      return true;
-    }
+  virtual double initialEstimatePossible(const OptimizableGraph::VertexSet&,
+                                         OptimizableGraph::Vertex*) {
+    return 1.;
+  }
+  virtual void initialEstimate(const OptimizableGraph::VertexSet& from,
+                               OptimizableGraph::Vertex* to);
 
-    virtual bool getMeasurementData(double* d) const{
-      Eigen::Map<Vector7d> v(d);
-      v = _measurement.toVector();
-      return true;
-    }
+  virtual bool setMeasurementData(const double* d) {
+    Eigen::Map<const Vector7d> v(d);
+    _measurement.fromVector(v);
+    _inverseMeasurement = _measurement.inverse();
+    return true;
+  }
 
-    virtual int measurementDimension() const {return 7;}
+  virtual bool getMeasurementData(double* d) const {
+    Eigen::Map<Vector7d> v(d);
+    v = _measurement.toVector();
+    return true;
+  }
 
-    virtual bool setMeasurementFromState();
-    
-  protected:
-    SE3Quat _inverseMeasurement;
+  virtual int measurementDimension() const { return 7; }
+
+  virtual bool setMeasurementFromState();
+
+ protected:
+  SE3Quat _inverseMeasurement;
 };
-
 
 /**
  * \brief edge between two SBAcam that specifies the distance between them
@@ -358,7 +343,8 @@ class G2O_TYPES_SBA_API EdgeSBAScale
 };
 
 /**
- * \brief edge between three SBACams to enforce piece-wise linear motion
+ * \brief edge between three SBACams to enforce piece-wise linear motion of
+ * object
  */
 class G2O_TYPES_SBA_API EdgeSBALinearMotion
     : public BaseMultiEdge<6, VertexCam> {
@@ -366,25 +352,41 @@ class G2O_TYPES_SBA_API EdgeSBALinearMotion
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   EdgeSBALinearMotion();
   EdgeSBALinearMotion(VertexCam* cam0, VertexCam* cam1, VertexCam* cam2);
-
   virtual bool read(std::istream& is);
   virtual bool write(std::ostream& os) const;
   void computeError() {
     const VertexCam* v0 = dynamic_cast<const VertexCam*>(_vertices[0]);
     const VertexCam* v1 = dynamic_cast<const VertexCam*>(_vertices[1]);
     const VertexCam* v2 = dynamic_cast<const VertexCam*>(_vertices[2]);
-    SE3Quat v10 = v1->estimate().inverse() * v0->estimate();
-    SE3Quat v21 = v2->estimate().inverse() * v1->estimate();
-    _error = (v10 * v21.inverse()).log();
-    //_error[0] = delta.translation().x();
-    //_error[1] = delta.translation().y();
-    //_error[2] = delta.translation().z();
-    //_error[3] = delta.rotation().x();
-    //_error[4] = delta.rotation().y();
-    //_error[5] = delta.rotation().z();
+    Isometry3D T_world_cam0 =
+        ((static_cast<const ParameterSE3Offset*>(parameter(0)))->offset());
+    Isometry3D T_world_cam1 =
+        ((static_cast<const ParameterSE3Offset*>(parameter(1)))->offset());
+    Isometry3D T_world_cam2 =
+        ((static_cast<const ParameterSE3Offset*>(parameter(2)))->offset());
+    SE3Quat T_cam0_obj = v0->estimate().inverse();
+    SE3Quat T_cam1_obj = v1->estimate().inverse();
+    SE3Quat T_cam2_obj = v2->estimate().inverse();
+    SE3Quat T_world_obj0 =
+        SE3Quat(T_world_cam0.rotation(), T_world_cam0.translation()) *
+        T_cam0_obj;
+    SE3Quat T_world_obj1 =
+        SE3Quat(T_world_cam1.rotation(), T_world_cam1.translation()) *
+        T_cam1_obj;
+    SE3Quat T_world_obj2 =
+        SE3Quat(T_world_cam2.rotation(), T_world_cam2.translation()) *
+        T_cam2_obj;
+    SE3Quat T_obj1_obj0 = T_world_obj1.inverse() * T_world_obj0;
+    SE3Quat T_obj2_obj1 = T_world_obj2.inverse() * T_world_obj1;
+    _error = (T_obj1_obj0 * T_obj2_obj1.inverse()).log();
   }
+
+ private:
+  ParameterSE3Offset* _T_world_cam0;
+  ParameterSE3Offset* _T_world_cam1;
+  ParameterSE3Offset* _T_world_cam2;
 };
 
-} // end namespace
+}  // namespace g2o
 
-#endif // SBA_TYPES
+#endif  // SBA_TYPES

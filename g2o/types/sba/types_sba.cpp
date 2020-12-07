@@ -25,6 +25,7 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "types_sba.h"
+
 #include <iostream>
 
 #include "g2o/core/factory.h"
@@ -52,14 +53,12 @@ G2O_REGISTER_TYPE(EDGE_LINEAR, EdgeSBALinearMotion);
 VertexIntrinsics::VertexIntrinsics() { _estimate << 1., 1., .5, .5, .1; }
 
 bool VertexIntrinsics::read(std::istream &is) {
-  for (int i = 0; i < 5; i++)
-    is >> _estimate[i];
+  for (int i = 0; i < 5; i++) is >> _estimate[i];
   return true;
 }
 
 bool VertexIntrinsics::write(std::ostream &os) const {
-  for (int i = 0; i < 5; i++)
-    os << _estimate[i] << " ";
+  for (int i = 0; i < 5; i++) os << _estimate[i] << " ";
   return os.good();
 }
 
@@ -108,10 +107,8 @@ bool VertexCam::write(std::ostream &os) const {
   const SBACam &cam = estimate();
 
   // first the position and orientation (vector3 and quaternion)
-  for (int i = 0; i < 3; i++)
-    os << cam.translation()[i] << " ";
-  for (int i = 0; i < 4; i++)
-    os << cam.rotation().coeffs()[i] << " ";
+  for (int i = 0; i < 3; i++) os << cam.translation()[i] << " ";
+  for (int i = 0; i < 4; i++) os << cam.rotation().coeffs()[i] << " ";
 
   // now fx, fy, cx, cy, baseline
   os << cam.Kcam(0, 0) << " ";
@@ -126,22 +123,19 @@ EdgeSBACam::EdgeSBACam() : BaseBinaryEdge<6, SE3Quat, VertexCam, VertexCam>() {}
 
 bool EdgeSBACam::read(std::istream &is) {
   Vector7d meas;
-  for (int i = 0; i < 7; i++)
-    is >> meas[i];
+  for (int i = 0; i < 7; i++) is >> meas[i];
   setMeasurement(SE3Quat(meas));
 
   for (int i = 0; i < 6; i++)
     for (int j = i; j < 6; j++) {
       is >> information()(i, j);
-      if (i != j)
-        information()(j, i) = information()(i, j);
+      if (i != j) information()(j, i) = information()(i, j);
     }
   return true;
 }
 
 bool EdgeSBACam::write(std::ostream &os) const {
-  for (int i = 0; i < 7; i++)
-    os << measurement()[i] << " ";
+  for (int i = 0; i < 7; i++) os << measurement()[i] << " ";
   for (int i = 0; i < 6; i++)
     for (int j = i; j < 6; j++) {
       os << " " << information()(i, j);
@@ -158,9 +152,12 @@ void EdgeSBACam::initialEstimate(const OptimizableGraph::VertexSet &from_,
   else
     from->setEstimate((SE3Quat)to->estimate() * _inverseMeasurement);
 }
-
 EdgeSBALinearMotion::EdgeSBALinearMotion() : BaseMultiEdge<6, VertexCam>() {
   resize(3);
+  resizeParameters(3);
+  installParameter(_T_world_cam0, 0);
+  installParameter(_T_world_cam1, 1);
+  installParameter(_T_world_cam2, 2);
 }
 
 EdgeSBALinearMotion::EdgeSBALinearMotion(VertexCam *cam0, VertexCam *cam1,
@@ -170,6 +167,10 @@ EdgeSBALinearMotion::EdgeSBALinearMotion(VertexCam *cam0, VertexCam *cam1,
   _vertices[0] = cam0;
   _vertices[1] = cam1;
   _vertices[2] = cam2;
+  resizeParameters(3);
+  installParameter(_T_world_cam0, 0);
+  installParameter(_T_world_cam1, 1);
+  installParameter(_T_world_cam2, 2);
 }
 
 bool EdgeSBALinearMotion::read(std::istream &is) {
@@ -192,8 +193,7 @@ VertexSBAPointXYZ::VertexSBAPointXYZ() : BaseVertex<3, Vector3D>() {}
 
 bool VertexSBAPointXYZ::read(std::istream &is) {
   Vector3D lv;
-  for (int i = 0; i < 3; i++)
-    is >> _estimate[i];
+  for (int i = 0; i < 3; i++) is >> _estimate[i];
   return true;
 }
 
@@ -213,8 +213,7 @@ EdgeProjectP2MC::EdgeProjectP2MC()
 
 bool EdgeProjectP2MC::read(std::istream &is) {
   // measured keypoint
-  for (int i = 0; i < 2; i++)
-    is >> _measurement[i];
+  for (int i = 0; i < 2; i++) is >> _measurement[i];
   setMeasurement(_measurement);
   // information matrix is the identity for features, could be changed to allow
   // arbitrary covariances
@@ -223,8 +222,7 @@ bool EdgeProjectP2MC::read(std::istream &is) {
 }
 
 bool EdgeProjectP2MC::write(std::ostream &os) const {
-  for (int i = 0; i < 2; i++)
-    os << measurement()[i] << " ";
+  for (int i = 0; i < 2; i++) os << measurement()[i] << " ";
   return os.good();
 }
 
@@ -234,8 +232,7 @@ EdgeProjectP2SC::EdgeProjectP2SC()
 
 bool EdgeProjectP2SC::read(std::istream &is) {
   Vector3D meas;
-  for (int i = 0; i < 3; i++)
-    is >> meas[i];
+  for (int i = 0; i < 3; i++) is >> meas[i];
   setMeasurement(meas);
   // information matrix is the identity for features, could be changed to allow
   // arbitrary covariances
@@ -244,8 +241,7 @@ bool EdgeProjectP2SC::read(std::istream &is) {
 }
 
 bool EdgeProjectP2SC::write(std::ostream &os) const {
-  for (int i = 0; i < 3; i++)
-    os << measurement()[i] << " ";
+  for (int i = 0; i < 3; i++) os << measurement()[i] << " ";
   return os.good();
 }
 
@@ -277,70 +273,70 @@ void EdgeProjectP2SC::linearizeOplus() {
     abort();
   }
 
-  double ipz2fx = ipz2 * cam.Kcam(0, 0); // Fx
-  double ipz2fy = ipz2 * cam.Kcam(1, 1); // Fy
-  double b = cam.baseline;               // stereo baseline
+  double ipz2fx = ipz2 * cam.Kcam(0, 0);  // Fx
+  double ipz2fy = ipz2 * cam.Kcam(1, 1);  // Fy
+  double b = cam.baseline;                // stereo baseline
 
   Eigen::Matrix<double, 3, 1, Eigen::ColMajor> pwt;
 
   // check for local vars
   pwt = (pt - trans)
-            .head<3>(); // transform translations, use differential rotation
+            .head<3>();  // transform translations, use differential rotation
 
   // dx
   Eigen::Matrix<double, 3, 1, Eigen::ColMajor> dp =
-      cam.dRdx * pwt; // dR'/dq * [pw - t]
+      cam.dRdx * pwt;  // dR'/dq * [pw - t]
   _jacobianOplusXj(0, 3) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXj(1, 3) = (pz * dp(1) - py * dp(2)) * ipz2fy;
   _jacobianOplusXj(2, 3) =
-      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx; // right image px
+      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx;  // right image px
   // dy
-  dp = cam.dRdy * pwt; // dR'/dq * [pw - t]
+  dp = cam.dRdy * pwt;  // dR'/dq * [pw - t]
   _jacobianOplusXj(0, 4) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXj(1, 4) = (pz * dp(1) - py * dp(2)) * ipz2fy;
   _jacobianOplusXj(2, 4) =
-      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx; // right image px
+      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx;  // right image px
   // dz
-  dp = cam.dRdz * pwt; // dR'/dq * [pw - t]
+  dp = cam.dRdz * pwt;  // dR'/dq * [pw - t]
   _jacobianOplusXj(0, 5) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXj(1, 5) = (pz * dp(1) - py * dp(2)) * ipz2fy;
   _jacobianOplusXj(2, 5) =
-      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx; // right image px
+      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx;  // right image px
 
   // set d(t) values [ pz*dpx/dx - px*dpz/dx ] / pz^2
-  dp = -cam.w2n.col(0); // dpc / dx
+  dp = -cam.w2n.col(0);  // dpc / dx
   _jacobianOplusXj(0, 0) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXj(1, 0) = (pz * dp(1) - py * dp(2)) * ipz2fy;
   _jacobianOplusXj(2, 0) =
-      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx; // right image px
-  dp = -cam.w2n.col(1);                         // dpc / dy
+      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx;  // right image px
+  dp = -cam.w2n.col(1);                          // dpc / dy
   _jacobianOplusXj(0, 1) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXj(1, 1) = (pz * dp(1) - py * dp(2)) * ipz2fy;
   _jacobianOplusXj(2, 1) =
-      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx; // right image px
-  dp = -cam.w2n.col(2);                         // dpc / dz
+      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx;  // right image px
+  dp = -cam.w2n.col(2);                          // dpc / dz
   _jacobianOplusXj(0, 2) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXj(1, 2) = (pz * dp(1) - py * dp(2)) * ipz2fy;
   _jacobianOplusXj(2, 2) =
-      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx; // right image px
+      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx;  // right image px
 
   // Jacobians wrt point parameters
   // set d(t) values [ pz*dpx/dx - px*dpz/dx ] / pz^2
-  dp = cam.w2n.col(0); // dpc / dx
+  dp = cam.w2n.col(0);  // dpc / dx
   _jacobianOplusXi(0, 0) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXi(1, 0) = (pz * dp(1) - py * dp(2)) * ipz2fy;
   _jacobianOplusXi(2, 0) =
-      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx; // right image px
-  dp = cam.w2n.col(1);                          // dpc / dy
+      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx;  // right image px
+  dp = cam.w2n.col(1);                           // dpc / dy
   _jacobianOplusXi(0, 1) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXi(1, 1) = (pz * dp(1) - py * dp(2)) * ipz2fy;
   _jacobianOplusXi(2, 1) =
-      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx; // right image px
-  dp = cam.w2n.col(2);                          // dpc / dz
+      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx;  // right image px
+  dp = cam.w2n.col(2);                           // dpc / dz
   _jacobianOplusXi(0, 2) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXi(1, 2) = (pz * dp(1) - py * dp(2)) * ipz2fy;
   _jacobianOplusXi(2, 2) =
-      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx; // right image px
+      (pz * dp(0) - (px - b) * dp(2)) * ipz2fx;  // right image px
 }
 
 /**
@@ -371,49 +367,49 @@ void EdgeProjectP2MC::linearizeOplus() {
     abort();
   }
 
-  double ipz2fx = ipz2 * cam.Kcam(0, 0); // Fx
-  double ipz2fy = ipz2 * cam.Kcam(1, 1); // Fy
+  double ipz2fx = ipz2 * cam.Kcam(0, 0);  // Fx
+  double ipz2fy = ipz2 * cam.Kcam(1, 1);  // Fy
 
   Eigen::Matrix<double, 3, 1, Eigen::ColMajor> pwt;
 
   // check for local vars
   pwt = (pt - trans)
-            .head<3>(); // transform translations, use differential rotation
+            .head<3>();  // transform translations, use differential rotation
 
   // dx
   Eigen::Matrix<double, 3, 1, Eigen::ColMajor> dp =
-      cam.dRdx * pwt; // dR'/dq * [pw - t]
+      cam.dRdx * pwt;  // dR'/dq * [pw - t]
   _jacobianOplusXj(0, 3) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXj(1, 3) = (pz * dp(1) - py * dp(2)) * ipz2fy;
   // dy
-  dp = cam.dRdy * pwt; // dR'/dq * [pw - t]
+  dp = cam.dRdy * pwt;  // dR'/dq * [pw - t]
   _jacobianOplusXj(0, 4) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXj(1, 4) = (pz * dp(1) - py * dp(2)) * ipz2fy;
   // dz
-  dp = cam.dRdz * pwt; // dR'/dq * [pw - t]
+  dp = cam.dRdz * pwt;  // dR'/dq * [pw - t]
   _jacobianOplusXj(0, 5) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXj(1, 5) = (pz * dp(1) - py * dp(2)) * ipz2fy;
 
   // set d(t) values [ pz*dpx/dx - px*dpz/dx ] / pz^2
-  dp = -cam.w2n.col(0); // dpc / dx
+  dp = -cam.w2n.col(0);  // dpc / dx
   _jacobianOplusXj(0, 0) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXj(1, 0) = (pz * dp(1) - py * dp(2)) * ipz2fy;
-  dp = -cam.w2n.col(1); // dpc / dy
+  dp = -cam.w2n.col(1);  // dpc / dy
   _jacobianOplusXj(0, 1) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXj(1, 1) = (pz * dp(1) - py * dp(2)) * ipz2fy;
-  dp = -cam.w2n.col(2); // dpc / dz
+  dp = -cam.w2n.col(2);  // dpc / dz
   _jacobianOplusXj(0, 2) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXj(1, 2) = (pz * dp(1) - py * dp(2)) * ipz2fy;
 
   // Jacobians wrt point parameters
   // set d(t) values [ pz*dpx/dx - px*dpz/dx ] / pz^2
-  dp = cam.w2n.col(0); // dpc / dx
+  dp = cam.w2n.col(0);  // dpc / dx
   _jacobianOplusXi(0, 0) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXi(1, 0) = (pz * dp(1) - py * dp(2)) * ipz2fy;
-  dp = cam.w2n.col(1); // dpc / dy
+  dp = cam.w2n.col(1);  // dpc / dy
   _jacobianOplusXi(0, 1) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXi(1, 1) = (pz * dp(1) - py * dp(2)) * ipz2fy;
-  dp = cam.w2n.col(2); // dpc / dz
+  dp = cam.w2n.col(2);  // dpc / dz
   _jacobianOplusXi(0, 2) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplusXi(1, 2) = (pz * dp(1) - py * dp(2)) * ipz2fy;
 }
@@ -459,65 +455,64 @@ void EdgeProjectP2MC_Intrinsics::linearizeOplus() {
     abort();
   }
 
-  double ipz2fx = ipz2 * cam.Kcam(0, 0); // Fx
-  double ipz2fy = ipz2 * cam.Kcam(1, 1); // Fy
+  double ipz2fx = ipz2 * cam.Kcam(0, 0);  // Fx
+  double ipz2fy = ipz2 * cam.Kcam(1, 1);  // Fy
 
   Eigen::Matrix<double, 3, 1, Eigen::ColMajor> pwt;
 
   // check for local vars
   pwt = (pt - trans)
-            .head<3>(); // transform translations, use differential rotation
+            .head<3>();  // transform translations, use differential rotation
 
   // dx
   Eigen::Matrix<double, 3, 1, Eigen::ColMajor> dp =
-      cam.dRdx * pwt; // dR'/dq * [pw - t]
+      cam.dRdx * pwt;  // dR'/dq * [pw - t]
   _jacobianOplus[1](0, 3) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplus[1](1, 3) = (pz * dp(1) - py * dp(2)) * ipz2fy;
   // dy
-  dp = cam.dRdy * pwt; // dR'/dq * [pw - t]
+  dp = cam.dRdy * pwt;  // dR'/dq * [pw - t]
   _jacobianOplus[1](0, 4) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplus[1](1, 4) = (pz * dp(1) - py * dp(2)) * ipz2fy;
   // dz
-  dp = cam.dRdz * pwt; // dR'/dq * [pw - t]
+  dp = cam.dRdz * pwt;  // dR'/dq * [pw - t]
   _jacobianOplus[1](0, 5) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplus[1](1, 5) = (pz * dp(1) - py * dp(2)) * ipz2fy;
 
   // set d(t) values [ pz*dpx/dx - px*dpz/dx ] / pz^2
-  dp = -cam.w2n.col(0); // dpc / dx
+  dp = -cam.w2n.col(0);  // dpc / dx
   _jacobianOplus[1](0, 0) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplus[1](1, 0) = (pz * dp(1) - py * dp(2)) * ipz2fy;
-  dp = -cam.w2n.col(1); // dpc / dy
+  dp = -cam.w2n.col(1);  // dpc / dy
   _jacobianOplus[1](0, 1) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplus[1](1, 1) = (pz * dp(1) - py * dp(2)) * ipz2fy;
-  dp = -cam.w2n.col(2); // dpc / dz
+  dp = -cam.w2n.col(2);  // dpc / dz
   _jacobianOplus[1](0, 2) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplus[1](1, 2) = (pz * dp(1) - py * dp(2)) * ipz2fy;
 
   // Jacobians wrt point parameters
   // set d(t) values [ pz*dpx/dx - px*dpz/dx ] / pz^2
-  dp = cam.w2n.col(0); // dpc / dx
+  dp = cam.w2n.col(0);  // dpc / dx
   _jacobianOplus[0](0, 0) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplus[0](1, 0) = (pz * dp(1) - py * dp(2)) * ipz2fy;
-  dp = cam.w2n.col(1); // dpc / dy
+  dp = cam.w2n.col(1);  // dpc / dy
   _jacobianOplus[0](0, 1) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplus[0](1, 1) = (pz * dp(1) - py * dp(2)) * ipz2fy;
-  dp = cam.w2n.col(2); // dpc / dz
+  dp = cam.w2n.col(2);  // dpc / dz
   _jacobianOplus[0](0, 2) = (pz * dp(0) - px * dp(2)) * ipz2fx;
   _jacobianOplus[0](1, 2) = (pz * dp(1) - py * dp(2)) * ipz2fy;
 
   // Jacobians w.r.t the intrinsics
   _jacobianOplus[2].setZero();
-  _jacobianOplus[2](0, 0) = px / pz; // dx/dfx
-  _jacobianOplus[2](1, 1) = py / pz; // dy/dfy
-  _jacobianOplus[2](0, 2) = 1.;      // dx/dcx
-  _jacobianOplus[2](1, 3) = 1.;      // dy/dcy
+  _jacobianOplus[2](0, 0) = px / pz;  // dx/dfx
+  _jacobianOplus[2](1, 1) = py / pz;  // dy/dfy
+  _jacobianOplus[2](0, 2) = 1.;       // dx/dcx
+  _jacobianOplus[2](1, 3) = 1.;       // dy/dcy
 }
 
 bool EdgeProjectP2MC_Intrinsics::read(std::istream &is) {
   // measured keypoint
   Vector2D meas;
-  for (int i = 0; i < 2; i++)
-    is >> meas[i];
+  for (int i = 0; i < 2; i++) is >> meas[i];
   setMeasurement(meas);
   // information matrix is the identity for features, could be changed to allow
   // arbitrary covariances
@@ -526,8 +521,7 @@ bool EdgeProjectP2MC_Intrinsics::read(std::istream &is) {
 }
 
 bool EdgeProjectP2MC_Intrinsics::write(std::ostream &os) const {
-  for (int i = 0; i < 2; i++)
-    os << measurement()[i] << " ";
+  for (int i = 0; i < 2; i++) os << measurement()[i] << " ";
   return os.good();
 }
 
@@ -577,4 +571,4 @@ bool EdgeSBACam::setMeasurementFromState() {
   return true;
 }
 
-} // namespace g2o
+}  // namespace g2o
